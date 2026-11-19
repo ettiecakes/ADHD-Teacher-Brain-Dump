@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b5bd6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Brain Dump">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Teacher Brain Dump</title>
+<style>
+:root{--bg:#faf7f2;--card:#fff;--ink:#2b2a33;--mute:#77747f;--line:#e8e2d8;--accent:#5b5bd6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 16px calc(80px + env(safe-area-inset-bottom))}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 16px;font-size:14px}
+.prompt{background:#fff;border:1px solid var(--line);border-left:6px solid var(--accent);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.pq{font-size:19px;font-weight:600}
+.pstep{font-size:12px;color:var(--mute);margin-top:4px}
+.pbtns{display:flex;gap:8px;margin-top:8px}
+.box{display:flex;gap:8px}
+textarea{flex:1;min-height:56px;padding:12px;border:2px solid var(--line);border-radius:14px;font:inherit;resize:none;background:#fff}
+textarea:focus{outline:none;border-color:var(--accent)}
+button{font:inherit;cursor:pointer}
+.add{background:var(--accent);color:#fff;border:0;border-radius:14px;padding:0 18px;font-weight:600}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:14px 0 10px;scrollbar-width:none}
+.tab{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:14px}
+.tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tab b{font-weight:600;margin-left:4px;opacity:.7}
+.item{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:8px}
+.item.done .t{text-decoration:line-through;color:var(--mute)}
+.chk{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:#fff;flex:none;margin-top:1px;padding:0}
+.done .chk{background:#3aa676;border-color:#3aa676}
+.t{flex:1;word-break:break-word}
+.meta{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12px;color:var(--mute)}
+.tag{border:0;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;color:#222}
+.del{background:none;border:0;color:var(--mute);font-size:18px;padding:0 4px}
+.empty{text-align:center;color:var(--mute);padding:32px 0}
+.foot{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.ghost{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px}
+.pick{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center}
+.pick.on{display:flex}
+.sheet{background:#fff;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sheet button{border:0;border-radius:12px;padding:14px;font-weight:600;color:#222}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<main>
+  <h1>Brain dump</h1>
+  <p class="sub">Get it out of your head. Sorting happens by itself.</p>
+  <div class="prompt" id="prompt">
+    <div class="pq" id="pq"></div>
+    <div class="pstep" id="pstep"></div>
+  </div>
+  <div class="box">
+    <textarea id="in" placeholder="Type one thing, press Enter" rows="2"></textarea>
+    <button class="add" id="add">Add</button>
+  </div>
+  <div class="pbtns">
+    <button class="ghost" id="skip">Nothing here → next</button>
+    <button class="ghost" id="free">Free dump</button>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="list"></div>
+  <div class="foot">
+    <button class="ghost" id="copy">Copy all to clipboard</button>
+    <button class="ghost" id="clear">Clear ticked</button>
+  </div>
+</main>
+<div class="pick" id="pick"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const BUCKETS=[
+ {id:'marking',name:'Marking',c:'#ffd9a8',k:['mark','marking','grade','feedback','rubric','assessment','moderat','report comment','reports','cover sheet','submission','folio','criteria']},
+ {id:'prep',name:'Prep & Orders',c:'#c9e7c4',k:['prep','order','buy','fabric','ingredients','groceries','photocopy','print','laminate','slides','worksheet','lesson','resource','setup','set up','equipment','machine','overlocker','thread','stock','shopping']},
+ {id:'admin',name:'Admin & Emails',c:'#cfd8ff',k:['email','reply','form','submit','approval','budget','meeting','roster','roll','data entry','onenote','qlearn','oneschool','excursion','permission','sign','due','deadline','pd ','training','hat ','evidence']},
+ {id:'students',name:'Students & Parents',c:'#ffc9d6',k:['parent','student','call home','phone','behaviour','wellbeing','support','ilp','adjustment','absent','catch up','conference','chat with','speak to','talk to']},
+ {id:'ideas',name:'Ideas',c:'#f3e3a0',k:['idea','maybe','what if','could','try','unit','project','inspiration','pinterest','explore','plan for next']},
+ {id:'life',name:'Home & Life',c:'#d8d2ee',k:['home','dinner','kids','doctor','dentist','car','birthday','gym','laundry','mum','dad','weekend','rent','pay bill']},
+ {id:'unsorted',name:'Unsorted',c:'#e6e3dc',k:[]}
+];
+const B=Object.fromEntries(BUCKETS.map(b=>[b.id,b]));
+let items=[],filter='all';
+try{items=JSON.parse(localStorage.getItem('tbd')||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem('tbd',JSON.stringify(items))}catch(e){}};
+const $=id=>document.getElementById(id);
+function sort(text){
+  const t=' '+text.toLowerCase()+' ';let best='unsorted',score=0;
+  for(const b of BUCKETS){let s=0;for(const k of b.k)if(t.includes(k))s++;if(s>score){score=s;best=b.id}}
+  return best;
+}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),1400)}
+const PROMPTS=[
+ {b:'marking',q:'Any marking or feedback hanging over you?'},
+ {b:'students',q:'Any student or parent you need to follow up with?'},
+ {b:'admin',q:'Any emails, forms or deadlines on your mind?'},
+ {b:'prep',q:'Anything to prep, print or order for next week?'},
+ {b:'ideas',q:'Any ideas you don\'t want to lose?'},
+ {b:'life',q:'Anything from home or life rattling around?'},
+ {b:null,q:'Anything else at all? Just get it out.'}
+];
+function lead(){
+  const n=new Date(),h=n.getHours()+n.getMinutes()/60;
+  if(h<8.5)return{b:null,q:'Morning check-in: what has to happen today?'};
+  if(h<15)return{b:null,q:'Quick check-in: anything just come up?'};
+  return{b:null,q:'Before you head home: what\'s still in your head?'};
+}
+PROMPTS.unshift(lead());
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){PROMPTS[0]=lead();pi=0;freeMode=false;showPrompt()}
+});
+let pi=0,freeMode=false;
+function showPrompt(){
+  const p=PROMPTS[pi];
+  $('pq').textContent=freeMode?'Free dump: anything goes.':p.q;
+  $('pstep').textContent=freeMode?'It will sort itself.':'Prompt '+(pi+1)+' of '+PROMPTS.length+(p.b?' · goes to '+B[p.b].name:'');
+  $('free').textContent=freeMode?'Back to prompts':'Free dump';
+  $('skip').style.display=freeMode?'none':'';
+}
+function addDump(){
+  const raw=$('in').value.trim();if(!raw)return;
+  const forced=!freeMode&&PROMPTS[pi].b;
+  raw.split('\n').map(s=>s.trim()).filter(Boolean).forEach(line=>{
+    items.unshift({id:Date.now()+Math.random(),text:line,b:forced||sort(line),done:false,at:Date.now()});
+  });
+  $('in').value='';save();render();$('in').focus();toast('Saved. Anything else here?');
+}
+function nextPrompt(){pi=(pi+1)%PROMPTS.length;showPrompt();$('in').focus()}
+function render(){
+  const counts={all:0};BUCKETS.forEach(b=>counts[b.id]=0);
+  items.forEach(i=>{if(!i.done){counts.all++;counts[i.b]++}});
+  $('tabs').innerHTML=[{id:'all',name:'All'},...BUCKETS].map(b=>
+    `<button class="tab ${filter===b.id?'on':''}" data-f="${b.id}">${b.name}<b>${counts[b.id]}</b></button>`).join('');
+  const vis=items.filter(i=>filter==='all'||i.b===filter).sort((a,b)=>a.done-b.done);
+  $('list').innerHTML=vis.length?vis.map(i=>{
+    const d=new Date(i.at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    return `<div class="item ${i.done?'done':''}"><button class="chk" data-c="${i.id}" aria-label="Done"></button>
+    <div class="t">${esc(i.text)}<div class="meta"><button class="tag" style="background:${B[i.b].c}" data-r="${i.id}">${B[i.b].name}</button><span>${d}</span></div></div>
+    <button class="del" data-d="${i.id}" aria-label="Delete">×</button></div>`}).join('')
+   :'<div class="empty">Nothing here. Brain: clear. ✨</div>';
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let retag=null;
+document.addEventListener('click',e=>{
+  const g=a=>e.target.closest('['+a+']');
+  let el;
+  if(el=g('data-f')){filter=el.dataset.f;render()}
+  else if(el=g('data-c')){const i=items.find(x=>x.id==el.dataset.c);i.done=!i.done;save();render()}
+  else if(el=g('data-d')){items=items.filter(x=>x.id!=el.dataset.d);save();render()}
+  else if(el=g('data-r')){retag=el.dataset.r;$('sheet').innerHTML=BUCKETS.map(b=>`<button style="background:${b.c}" data-pick="${b.id}">${b.name}</button>`).join('');$('pick').classList.add('on')}
+  else if(el=g('data-pick')){items.find(x=>x.id==retag).b=el.dataset.pick;$('pick').classList.remove('on');save();render()}
+  else if(e.target===$('pick'))$('pick').classList.remove('on');
+});
+$('add').onclick=addDump;
+$('skip').onclick=nextPrompt;
+$('free').onclick=()=>{freeMode=!freeMode;showPrompt();$('in').focus()};
+$('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addDump()}});
+$('clear').onclick=()=>{items=items.filter(i=>!i.done);save();render()};
+$('copy').onclick=async()=>{
+  const txt=BUCKETS.map(b=>{const l=items.filter(i=>i.b===b.id&&!i.done);return l.length?b.name+'\n'+l.map(i=>'- '+i.text).join('\n'):''}).filter(Boolean).join('\n\n');
+  try{await navigator.clipboard.writeText(txt);toast('Copied')}catch(e){toast('Copy blocked here')}
+};
+render();showPrompt();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
