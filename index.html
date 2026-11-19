@@ -114,8 +114,8 @@ function lead(){
 }
 PROMPTS.unshift(lead());
 function periodKey(){
-  const n=new Date(),h=n.getHours()+n.getMinutes()/60;
-  return n.toLocaleDateString('en-CA')+(h<8.5?'-am':h<15?'-day':'-pm');
+  // One check-in per day: resets after midnight (device local time).
+  return new Date().toLocaleDateString('en-CA');
 }
 function checkinDone(){try{return localStorage.getItem('tbd_done')===periodKey()}catch(e){return false}}
 function markDone(){try{localStorage.setItem('tbd_done',periodKey())}catch(e){}}
