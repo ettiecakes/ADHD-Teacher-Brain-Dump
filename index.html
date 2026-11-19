@@ -113,12 +113,27 @@ function lead(){
   return{b:null,q:'Before you head home: what\'s still in your head?'};
 }
 PROMPTS.unshift(lead());
+function periodKey(){
+  const n=new Date(),h=n.getHours()+n.getMinutes()/60;
+  return n.toLocaleDateString('en-CA')+(h<8.5?'-am':h<15?'-day':'-pm');
+}
+function checkinDone(){try{return localStorage.getItem('tbd_done')===periodKey()}catch(e){return false}}
+function markDone(){try{localStorage.setItem('tbd_done',periodKey())}catch(e){}}
+let pi=0,freeMode=false,openMode=checkinDone();
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'){PROMPTS[0]=lead();pi=0;freeMode=false;showPrompt()}
+  if(document.visibilityState==='visible'){
+    PROMPTS[0]=lead();pi=0;freeMode=false;openMode=checkinDone();showPrompt();
+  }
 });
-let pi=0,freeMode=false;
 function showPrompt(){
   const p=PROMPTS[pi];
+  if(openMode){
+    $('pq').textContent='Anything pop up? Get it out of your head.';
+    $('pstep').textContent='Check-in done for now · it will sort itself';
+    $('free').textContent='Redo check-in';
+    $('skip').style.display='none';
+    return;
+  }
   $('pq').textContent=freeMode?'Free dump: anything goes.':p.q;
   $('pstep').textContent=freeMode?'It will sort itself.':'Prompt '+(pi+1)+' of '+PROMPTS.length+(p.b?' · goes to '+B[p.b].name:'');
   $('free').textContent=freeMode?'Back to prompts':'Free dump';
@@ -126,13 +141,17 @@ function showPrompt(){
 }
 function addDump(){
   const raw=$('in').value.trim();if(!raw)return;
-  const forced=!freeMode&&PROMPTS[pi].b;
+  const forced=!freeMode&&!openMode&&PROMPTS[pi].b;
   raw.split('\n').map(s=>s.trim()).filter(Boolean).forEach(line=>{
     items.unshift({id:Date.now()+Math.random(),text:line,b:forced||sort(line),done:false,at:Date.now()});
   });
   $('in').value='';save();render();$('in').focus();toast('Saved. Anything else here?');
 }
-function nextPrompt(){pi=(pi+1)%PROMPTS.length;showPrompt();$('in').focus()}
+function nextPrompt(){
+  if(pi>=PROMPTS.length-1){openMode=true;markDone();toast('Check-in done. Dump anything that pops up.')}
+  else pi++;
+  showPrompt();$('in').focus();
+}
 function render(){
   const counts={all:0};BUCKETS.forEach(b=>counts[b.id]=0);
   items.forEach(i=>{if(!i.done){counts.all++;counts[i.b]++}});
@@ -160,7 +179,11 @@ document.addEventListener('click',e=>{
 });
 $('add').onclick=addDump;
 $('skip').onclick=nextPrompt;
-$('free').onclick=()=>{freeMode=!freeMode;showPrompt();$('in').focus()};
+$('free').onclick=()=>{
+  if(openMode){openMode=false;pi=0;freeMode=false}
+  else freeMode=!freeMode;
+  showPrompt();$('in').focus();
+};
 $('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addDump()}});
 $('clear').onclick=()=>{items=items.filter(i=>!i.done);save();render()};
 $('copy').onclick=async()=>{
